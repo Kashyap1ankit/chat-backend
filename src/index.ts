@@ -1,6 +1,5 @@
-import express, { Request, Response } from "express";
+import express from "express";
 import { WebSocketServer } from "ws";
-import { v4 as uuidv4 } from "uuid";
 
 const port = 5000;
 
@@ -19,10 +18,8 @@ const rooms: {
   users: string[];
 }[] = [];
 
-function createRoom(ws: any, userId: string) {
-  const id = uuidv4();
+function createRoom(id: string, ws: any, userId: string) {
   users.push(userId);
-
   rooms.push({
     id,
     users: [userId],
@@ -42,27 +39,43 @@ wss.on("connection", (ws) => {
   ws.on("error", console.error);
 
   ws.on("message", async (data) => {
-    if (JSON.parse(data.toString()).message === "create") {
-      const response = createRoom(ws, JSON.parse(data.toString()).userId);
-      console.log("created response", rooms);
-      return;
-    }
-    if (JSON.parse(data.toString()).message === "join") {
-      const response = joinRoom(
-        JSON.parse(data.toString()).roomId,
-        JSON.parse(data.toString()).userId,
-        ws
-      );
-      console.log("response", response);
-    }
+    try {
+      if (JSON.parse(data.toString()).message === "establish") {
+        console.log("established");
+        ws.send(JSON.stringify({ message: "established" }));
+        return;
+      }
 
-    if (JSON.parse(data.toString()).message === "send") {
-      const userId = JSON.parse(data.toString()).userId;
-      const findRoom = rooms.filter((e) => e.users.some((e) => e === userId));
+      if (JSON.parse(data.toString()).message === "create") {
+        const response = createRoom(
+          JSON.parse(data.toString()).id,
+          ws,
+          JSON.parse(data.toString()).username
+        );
+        console.log("created response", rooms);
+        ws.send(JSON.stringify({ message: "created", id: response.id }));
+        return;
+      }
 
-      findRoom[0].ws.forEach((e) => {
-        e.send(JSON.parse(data.toString()).userMessage);
-      });
+      if (JSON.parse(data.toString()).message === "join") {
+        const response = joinRoom(
+          JSON.parse(data.toString()).roomId,
+          JSON.parse(data.toString()).username,
+          ws
+        );
+        console.log("response", response);
+      }
+
+      if (JSON.parse(data.toString()).message === "send") {
+        const userId = JSON.parse(data.toString()).username;
+        const findRoom = rooms.filter((e) => e.users.some((e) => e === userId));
+
+        findRoom[0].ws.forEach((e) => {
+          e.send(JSON.parse(data.toString()).userMessage);
+        });
+      }
+    } catch (error) {
+      ws.send(`error:${error}`);
     }
   });
 
