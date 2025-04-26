@@ -31,23 +31,12 @@ export class Socket {
 
         if (parsedData.type === "join") {
           this.joinRoom(parsedData.data.roomId, parsedData.data.userId, ws);
-          console.log(this.rooms);
         }
 
         //send message in a particular room
 
         if (parsedData.type === "send-message") {
-          const findRoom = this.rooms.find(
-            (e) => e.roomId === parsedData.data.roomId
-          );
-
-          if (!findRoom) throw new Error("No such room exits");
-
-          findRoom.ws.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-              client.send(parsedData.data.message);
-            }
-          });
+          this.sendMessage(parsedData.data.roomId, parsedData.data.message, ws);
         }
       });
 
@@ -80,5 +69,17 @@ export class Socket {
     } catch {
       console.log("error aaya hai join krn eme");
     }
+  }
+
+  async sendMessage(roomId: string, message: string, ws: WebSocket) {
+    const findRoom = this.rooms.find((e) => e.roomId === roomId);
+
+    if (!findRoom) throw new Error("No such room exits");
+
+    findRoom.ws.forEach((client) => {
+      if (client !== ws && client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    });
   }
 }
