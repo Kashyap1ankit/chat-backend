@@ -1,10 +1,12 @@
-import { WebSocketServer, WebSocket } from "ws";
+import { WebSocketServer } from "ws";
+import { v4 as uuidv4 } from "uuid";
 
 export class Socket {
   private wss: WebSocketServer;
   private rooms: {
-    id: string;
     ws: WebSocket[];
+    roomId: string;
+    users: string[];
   }[];
 
   constructor(httpServer: any) {
@@ -12,54 +14,71 @@ export class Socket {
     this.rooms = [];
   }
 
+  //initialising the connection part
+
   async start() {
     this.wss.on("connection", (ws) => {
-      ws.on("message", async (data) => {
-        const parsedData = JSON.parse(data.toString());
-        try {
-          if (parsedData.type === "establish") {
-            ws.send(JSON.stringify({ message: "established" }));
-            return;
-          }
+      ws.on("message", async (data: any) => {
+        const parsedData = JSON.parse(data);
 
-          if (parsedData.type === "create") {
-            const response = this.createRoom(parsedData.id, ws);
-            ws.send(JSON.stringify({ message: "created", id: response.id }));
-            return;
-          }
+        //Creating the room
 
-          if (parsedData.type === "join") {
-            const response = this.joinRoom(parsedData.roomId, ws);
-            console.log("response", response);
-          }
+        if (parsedData.type === "create") {
+          this.createRoom(ws, parsedData.data.userId);
+        }
 
-          if (parsedData.type === "send") {
-            const roomId = parsedData.roomId;
-            const findRoom = this.rooms.filter((e) => e.id === roomId);
+        //joinin the room
 
-            findRoom[0].ws.forEach((e) => {
-              e.send(parsedData.userMessage);
-            });
-          }
-        } catch (error) {
-          ws.send(`error:${error}`);
+        if (parsedData.type === "join") {
+          this.joinRoom(parsedData.data.roomId, parsedData.data.userId, ws);
+          console.log(this.rooms);
+        }
+
+        //send message in a particular room
+
+        if (parsedData.type === "send-message") {
+          const findRoom = this.rooms.find(
+            (e) => e.roomId === parsedData.data.roomId
+          );
+
+          if (!findRoom) throw new Error("No such room exits");
+
+          findRoom.ws.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(parsedData.data.message);
+            }
+          });
         }
       });
+
+      ws.send("connected");
     });
   }
 
-  private createRoom(id: string, ws: any) {
-    this.rooms.push({
-      id,
-      ws: [ws],
-    });
-    return { id };
+  //creating the room
+
+  async createRoom(ws: WebSocket, userId: string) {
+    try {
+      const roomId = uuidv4();
+
+      this.rooms.push({
+        roomId: roomId,
+        ws: [ws],
+        users: [userId],
+      });
+    } catch {
+      console.log("hi error in creating room");
+    }
   }
 
-  private joinRoom(roomId: string, ws: WebSocket) {
-    const room = this.rooms.filter((e) => e.id === roomId);
-    console.log("mila room", room);
-    room[0].ws.push(ws);
-    return room;
+  async joinRoom(roomId: string, userId: string, ws: WebSocket) {
+    try {
+      const findRoom = this.rooms.find((room) => room.roomId === roomId);
+      if (!findRoom) throw new Error("No room found");
+      findRoom.ws.push(ws);
+      findRoom.users.push(userId);
+    } catch {
+      console.log("error aaya hai join krn eme");
+    }
   }
 }

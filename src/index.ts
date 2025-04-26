@@ -1,6 +1,6 @@
 import "dotenv/config";
 import express, { Request, Response } from "express";
-import { Socket } from "./classes/socket.class";
+// import { Socket } from "./classes/socket.class";
 import config from "./config/config";
 import { authRouter } from "./routes/auth";
 import passport from "passport";
@@ -8,6 +8,7 @@ import expressSession from "express-session";
 import { PrismaSessionStore } from "@quixo3/prisma-session-store";
 import { prisma } from "./db/db";
 import cors from "cors";
+import { initializeServer, Socket } from "./classes/socket.class";
 
 const port = config.PORT;
 
@@ -51,5 +52,5 @@ const httpServer = app.listen(port, () => {
 });
 
 const wsServer = new Socket(httpServer);
-console.log(process.env.NODE_ENV);
+
 wsServer.start();
